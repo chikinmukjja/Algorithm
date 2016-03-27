@@ -18,9 +18,10 @@ int main()
 		CHECK_TIME_START;
 		quickSort(a, 0, SIZE - 1);
 		CHECK_TIME_END(quick, err);
+		printf("quick time : %.6f\n", quick);
 	}
 	
-	printf("quick time : %.6f\n", quick);
+
 
 	{
 		
