@@ -117,14 +117,12 @@ int main(int argc, char* argv[])
 	} while (true);
 
 
-	int index=0;                         // 마지막에 셋이 없으면 전에 단계 L, 1개 있으면 해당셋 
-	if (L[k].size() == 1)index = k;
-	else index = k-1;
-
-	for (unsigned int i = 0; i < L[index].size(); i++) {
-		set<set<int>> subsets;
-		findSubsets(subsets,L[index][i].item);
-		makeRule(L[index][i].item, subsets,C,transactionSize,fileOut);
+	for (unsigned int j = 1;j< L.size();j++) {
+		for (unsigned int i = 0; i < L[j].size(); i++) {
+			set<set<int>> subsets;
+			findSubsets(subsets, L[j][i].item);
+			makeRule(L[j][i].item, subsets, C, transactionSize, fileOut);
+		}
 	}
 
 
