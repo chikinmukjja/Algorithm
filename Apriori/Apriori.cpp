@@ -4,6 +4,10 @@
 #include<string>
 #include<vector>
 #include<set>
+#include<time.h> 
+#include<Windows.h>
+
+
 
 using namespace std;
 
@@ -24,16 +28,22 @@ public:
 
 };
 
+#define CHECK_TIME_START  __int64 freq, start, end; if (QueryPerformanceFrequency((_LARGE_INTEGER*)&freq))  {QueryPerformanceCounter((_LARGE_INTEGER*)&start);   
+#define CHECK_TIME_END(a, b)   QueryPerformanceCounter((_LARGE_INTEGER*)&end);  a = (float)((double)(end - start) / freq * 1000); b = TRUE; }else b = FALSE;
+// a는 float type  milli second이고 b가 FALSE일때는 에러입니다 
+
+
+
 int split(const string& text, string& separators, set<int>& transaction);
 void showTrans(vector<set<int>> transaction);
 bool scanTransaction(set<int> transaction, Itemsets& C);
-void prunningC(vector<Itemsets> C, vector<Itemsets>& L, double minSupport, int transactionSize);
+void checkMinSup(vector<Itemsets> C, vector<Itemsets>& L, double minSupport, int transactionSize);
 void showCorL(vector<Itemsets> CorL, int transactionSize);
 void selfJoinL(vector<Itemsets> L, vector<Itemsets>& C,int k);
 void scanC(vector<set<int>> transaction, vector<Itemsets> &C);
 void makeRule(set<int> initial, set<set<int>> subsets, vector<vector<Itemsets>> C,int transactionSize,ofstream& fileOut);
 void findSubsets(set<set<int>> &sets, set<int> initial);
-
+void pruningC(vector<Itemsets>& C, vector<Itemsets> L);
 
 
 int main(int argc, char* argv[])
@@ -73,21 +83,28 @@ int main(int argc, char* argv[])
 	int max=0;
 	int num=0;
 
+	double time;
+	bool err;
+
+
+	CHECK_TIME_START;
+
 	while (fileIn.good()) {
 		set<int> tmpset;
 		getline(fileIn, fileLine);
+		//cout <<fileLine<<endl ;
 		transactionSize++;
 		if(max < (num = split(fileLine, del, tmpset)))max = num;
 		transaction.push_back(tmpset);
 	}
 
-
+	
 	//initialize C0
 	vector<Itemsets> C0;
 	C.push_back(C0);
 	
 
-	for (int i = 1; i <= max; i++) {
+	for (int i = 0; i <= max; i++) {
 		
 		Itemsets tmp(i);
 														// C0 스캐닝
@@ -104,19 +121,20 @@ int main(int argc, char* argv[])
 		//cout << "------------------[ " << k + 1 << " ]------------------" << endl;
 		vector<Itemsets> tmpL;
 		L.push_back(tmpL);
-		prunningC(C[k],L[k],minSupport,transactionSize); //make L
+		checkMinSup(C[k],L[k],minSupport,transactionSize); //make L
 		
 		if (L[k].size() < 2)break;
 		
 		vector<Itemsets> tmpC;
 		C.push_back(tmpC);
 		selfJoinL(L[k],C[k+1],k);
+		//if(k!=0)pruningC(C[k + 1], L[k]);
 		scanC(transaction, C[k + 1]);                    //make C
 		k = k + 1;
 
 	} while (true);
 
-
+	
 	for (unsigned int j = 1;j< L.size();j++) {
 		for (unsigned int i = 0; i < L[j].size(); i++) {
 			set<set<int>> subsets;
@@ -124,8 +142,8 @@ int main(int argc, char* argv[])
 			makeRule(L[j][i].item, subsets, C, transactionSize, fileOut);
 		}
 	}
-
-
+	CHECK_TIME_END(time, err);
+	cout <<fixed<<setprecision(3)<< time/1000 <<" sec"<< endl;
 	/*
 	cout << "max = " << max << endl;
 	cout << minSupport << endl;
@@ -160,39 +178,39 @@ void makeRule(set<int> initial, set<set<int>> subsets,vector<vector<Itemsets>> C
 			}
 			
 			set<int>::iterator j = (*i).begin();
-			cout << "{";
+			//cout << "{";
 			fileOut<< "{";
 			for (; j != (*i).end(); j++) {
 				copySet.erase((*j));
 				
 				if (j != (*i).begin()) {
 					fileOut<< ",";
-					cout << ",";
+			//		cout << ",";
 				}
-				cout << *j;
+			//	cout << *j;
 				fileOut << *j;
 			}
-			cout << "}\t";
+			//cout << "}\t";
 			fileOut<< "}\t";
 
 			set<int>::iterator k = copySet.begin();
 			
-			cout << "{";
+			//cout << "{";
 			fileOut<< "{";
 			for (; k != copySet.end(); k++) {
 				if (k != copySet.begin()) {
 					fileOut<< ",";
-					cout << ",";
+			//		cout << ",";
 				}
-				cout << *k;
+			//	cout << *k;
 				fileOut << *k;
 			}
-			cout << "}";
-			cout << "\t" << setprecision(4) << AUB*100 / (double)transactionSize;
-			cout << "\t" << setprecision(4) << AUB*100 / (double)A << endl;
+			//cout << "}";
+			//cout << "\t" << setprecision(4) << AUB*100 / (double)transactionSize;
+			//cout << "\t" << setprecision(4) << AUB*100 / (double)A << endl;
 			fileOut<< "}";
-			fileOut << "\t" << setprecision(4) << AUB * 100 / (double)transactionSize;
-			fileOut << "\t" << setprecision(4) << AUB * 100 / (double)A << endl;
+			fileOut << "\t"<<fixed << setprecision(2) << AUB * 100 / (double)transactionSize;
+			fileOut << "\t"<<fixed << setprecision(2) << AUB * 100 / (double)A << endl;
 		}
 	}
 }
@@ -212,29 +230,65 @@ void findSubsets(set<set<int>> &sets, set<int> initial)
 		findSubsets(sets, new_set);//recursion ...
 	}
 }
+
 void scanC(vector<set<int>> transaction,vector<Itemsets> &C) 
 {
 	for (unsigned int i = 0; i < C.size() ; i++) {
-
-		// C0 스캐닝
+		// C scan
 		for (unsigned int j = 0; j < transaction.size(); j++) {
 			scanTransaction(transaction[j], C[i]);
 		}
-
 							// STL에 elem에 집어 넣을 때 값으로 넘어감  
 	}
 }
 
-void selfJoinL(vector<Itemsets> L,vector<Itemsets>& C,int k) 
+void pruningC(vector<Itemsets>& C, vector<Itemsets> L) 
 {
-	bool check= true;
-	
+	bool flag = false;
+
+	for (int i = 0; i < C.size(); ) {  //새로만들어진 C+1에 대해서
+
+		set<int>::iterator j = C[i].item.begin();
+		for (; j != C[i].item.end(); j++)//for each item in the set
+		{
+			set<int> new_set(C[i].item);//copy the set
+			new_set.erase(new_set.find(*j));//remove the current item
+			flag = false;
+
+			//해당 섭셋이 있는지 확인
+			for (int n = 0; n < L.size(); n++) { 
+				if (L[n].item == new_set) {
+					flag = false;
+					break;  // 있다 -> 다음 섭셋 확인
+				}
+				else flag = true;                // 없다 -> 다른 L찾기 
+			}
+			
+			if (flag) {
+				C.erase(C.begin()+i);
+				break;  // false -> 더확인해봐라
+						// true -> 다른 섭셋 확인할 필요없이 그 C+1의 항목은 안됌
+			}
+			
+		}
+		if (flag);
+		else {
+			i++;
+		}
+
+	}
+}
+
+void selfJoinL(vector<Itemsets> L, vector<Itemsets>& C, int k)
+{
+	bool check = true;
+
 	for (unsigned int i = 0; i < L.size(); i++) {
 		for (unsigned int j = i + 1; j < L.size(); j++) {
 			//set합치기
 			Itemsets tmp(L[i].item); //기존 L의 항목에 
 			tmp.item.insert(L[j].item.begin(), L[j].item.end()); // 다른 L+a 항목을 합친다, 
-			
+
 			if (tmp.item.size() == k + 2) { // k와 알맞는 원소 셋 item 수일때만 저장
 
 				for (unsigned int n = 0; n < C.size(); n++) {
@@ -244,33 +298,59 @@ void selfJoinL(vector<Itemsets> L,vector<Itemsets>& C,int k)
 					}
 				}
 
-				if (check)C.push_back(tmp);
+				if (check) {
+					bool allFlag = true;
+					if (k != 0) {
+
+						set<int>::iterator x = tmp.item.begin();
+						for (; x != tmp.item.end(); x++)//for each item in the set
+						{
+							set<int> new_set(tmp.item);//copy the set
+							new_set.erase(new_set.find(*x));//remove the current item
+							bool flag = false;
+
+							//해당 섭셋이 있는지 확인
+							for (int y = 0; y < L.size(); y++) {
+								if (L[y].item == new_set) {
+									flag = true;
+									break;
+								}
+							}
+							allFlag = flag;
+							if (allFlag == false)break;
+						}
+					}
+					if(allFlag == true)C.push_back(tmp);
+				}
 				check = true;
 			}
 
 			// 같은 벡터에 같은 원소가 있는 
-			
+
 		}
 	}
 	/*
 	for (int i = 0; i < C.size(); i++) {
 
-		set<int>::iterator iter;
+	set<int>::iterator iter;
 
-		for (iter = C[i].item.begin(); iter != C[i].item.end(); ++iter) {
-			cout << *iter << " ";
-		}
-		cout << endl;
+	for (iter = C[i].item.begin(); iter != C[i].item.end(); ++iter) {
+	cout << *iter << " ";
+	}
+	cout << endl;
 
 	}
 	*/
-	
+
 
 }
 
-void prunningC(vector<Itemsets> C, vector<Itemsets>& L,double minSupport,int transactionSize) 
+void checkMinSup(vector<Itemsets> C, vector<Itemsets>& L,double minSupport,int transactionSize) 
 {
 	
+	
+
+	//min_sup 만족하는지
 	for (unsigned int i = 0; i < C.size(); i++) {
 		if (C[i].supportNum/(double)transactionSize >= minSupport/100) {
 			L.push_back(C[i]);
