@@ -5,6 +5,8 @@ Apriori  : apriori(not advanced), transaction list -> input.txt, Association Rul
 
 DistanceVector : simulate routing algorithm using distance vector
 
+ReliableUDP : added ARQ(selective repeat) on UDP
+
 WebProxy : getting Http request on browser, can watch message content and receive Http response message
 
 sortTest : quicksort, insertionsort, func measuring time 
